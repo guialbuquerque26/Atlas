@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/uploads/*
+data/db/*
+data/logs/*
+data/run/*
+!data/**/.gitkeep
+.pytest_cache/
+*.egg-info/
+
+# Bases e resultados locais (podem conter dados privados)
+data/conhecimento/
+data/servicos/

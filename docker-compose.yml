@@ -1,0 +1,60 @@
+# Atlas em produção: Ollama (GPU) + API, na VM com passthrough.
+#
+#   docker compose up -d
+#   docker compose exec ollama ollama pull qwen2.5:7b-instruct
+#   docker compose exec ollama ollama pull qwen2.5vl:3b
+#   docker compose exec ollama ollama pull nomic-embed-text
+#
+# Requer NVIDIA Container Toolkit instalado na VM.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      # A GPU serializa: mais paralelismo só engorda fila e briga por VRAM.
+      OLLAMA_NUM_PARALLEL: "2"
+      # 3 modelos residentes (texto 5,3 GB + visão 3B 3,2 GB + embed 0,6 GB ≈ 9,1 GB)
+      # evita a troca constante que custa 2,4-9,1 s por alternância.
+      OLLAMA_MAX_LOADED_MODELS: "3"
+      OLLAMA_KEEP_ALIVE: "30m"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"   # só local; quem expõe é o proxy reverso
+    volumes:
+      - atlas_dados:/dados
+    environment:
+      ATLAS_OLLAMA_HOST: http://ollama:11434
+      ATLAS_DATA_DIR: /dados
+      # Visão 3B para os três modelos caberem em 12 GB (ver comentário acima).
+      ATLAS_VISION_MODEL: qwen2.5vl:3b
+      # Produção: defina o token e as origens permitidas.
+      ATLAS_API_TOKEN: ${ATLAS_API_TOKEN:?defina ATLAS_API_TOKEN no .env}
+      ATLAS_CORS_ORIGINS: ${ATLAS_CORS_ORIGINS:-}
+      ATLAS_MAX_INFERENCIAS: "2"
+      ATLAS_UPLOAD_MAX_MB: "50"
+
+volumes:
+  ollama_models:
+  atlas_dados:

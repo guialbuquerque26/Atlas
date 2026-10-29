@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas"
+version = "0.1.0"
+description = "Sistema modular de IA multimodal com modelos abertos, executado localmente"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+# Instalado em modo editável (`pip install -e .`), o pacote passa a ser
+# importável de qualquer diretório — não só da raiz do projeto.
+[project.scripts]
+atlas = "atlas.cli:main"
+atlas-supervisor = "atlas.supervisor.__main__:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["atlas*"]
+
+[tool.pytest.ini_options]
+# A convenção do projeto é pt-br: pasta "testes" e arquivos "teste_*.py".
+testpaths = ["testes"]
+python_files = ["teste_*.py"]
+python_classes = ["Teste*"]
+python_functions = ["teste_*"]
+addopts = "-q"

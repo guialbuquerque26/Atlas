@@ -1,0 +1,45 @@
+# Instalação direta na VM (sem Docker).
+#   sudo cp implantacao/atlas-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now atlas-api
+#
+# Pressupõe o Ollama como serviço próprio (ollama.service, instalado pelo
+# instalador oficial) — por isso o After/Wants abaixo.
+
+[Unit]
+Description=Atlas — API (FastAPI)
+After=network-online.target ollama.service
+Wants=network-online.target
+# Não é Requires: se o Ollama cair, a API continua de pé respondendo 503 no
+# /ready. Derrubar a API junto só tiraria a visibilidade do problema.
+
+[Service]
+Type=simple
+User=atlas
+Group=atlas
+WorkingDirectory=/opt/atlas
+EnvironmentFile=/opt/atlas/.env
+
+# Um worker: a GPU serializa a inferência (mais workers não somam vazão) e
+# SQLite/ChromaDB são single-writer.
+ExecStart=/opt/atlas/.venv/bin/uvicorn atlas.api.server:app \
+    --host 127.0.0.1 --port 8000 --workers 1
+
+Restart=always
+RestartSec=5
+# Reinício em laço é sintoma, não solução: se falhar 5x em 60s, para e alerta.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Endurecimento básico
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/atlas/data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=atlas-api
+
+[Install]
+WantedBy=multi-user.target
